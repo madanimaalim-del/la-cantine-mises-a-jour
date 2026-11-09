@@ -43,6 +43,14 @@ function Install-Winget($id) {
     return ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq -1978335189)
 }
 
+# Run a program but never wait more than $sec seconds (RustDesk commands can hang)
+function Run-Timeout($exe, $argList, $sec = 30) {
+    try {
+        $p = Start-Process $exe -ArgumentList $argList -PassThru -WindowStyle Hidden
+        if (-not $p.WaitForExit($sec * 1000)) { try { $p.Kill() } catch {} ; Warn "'$argList' took too long, skipped" }
+    } catch { Warn "'$argList' failed: $_" }
+}
+
 function Download($url, $file) {
     $dest = Join-Path $env:TEMP $file
     Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
@@ -86,10 +94,10 @@ if (-not (Test-Path $rd)) {
 }
 if (Test-Path $rd) {
     Ok "RustDesk installed"
-    Start-Process $rd -ArgumentList '--install-service' -Wait -ErrorAction SilentlyContinue
+    if (-not (Get-Service -Name RustDesk -ErrorAction SilentlyContinue)) { Run-Timeout $rd '--install-service' 60 }
     Start-Sleep 5
-    if ($rdPass) { Start-Process $rd -ArgumentList "--password `"$rdPass`"" -Wait; Ok "Permanent password set" }
-    Start-Process $rd -ArgumentList '--option direct-server Y' -Wait -ErrorAction SilentlyContinue
+    if ($rdPass) { Run-Timeout $rd "--password `"$rdPass`"" 20; Ok "Permanent password set" }
+    Run-Timeout $rd '--option direct-server Y' 15
     # Also write the option into the service's config so it survives
     $cfgDirs = @('C:\Windows\ServiceProfiles\LocalService\AppData\Roaming\RustDesk\config',
                  "$env:APPDATA\RustDesk\config")
@@ -104,7 +112,12 @@ if (Test-Path $rd) {
         }
     }
     Restart-Service -Name RustDesk -ErrorAction SilentlyContinue
-    $rdId = (& $rd --get-id 2>$null | Out-String).Trim()
+    $idFile = Join-Path $env:TEMP 'rustdesk-id.txt'
+    try {
+        $p = Start-Process $rd -ArgumentList '--get-id' -PassThru -NoNewWindow -RedirectStandardOutput $idFile
+        if (-not $p.WaitForExit(15000)) { try { $p.Kill() } catch {} }
+        $rdId = (Get-Content $idFile -Raw -ErrorAction SilentlyContinue | Out-String).Trim()
+    } catch { $rdId = '' }
     Ok "Direct IP access enabled (connect using the Tailscale address)"
     if ($rdId) { Ok "RustDesk ID: $rdId" }
     # Allow RustDesk direct port from Tailscale only
