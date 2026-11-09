@@ -6,6 +6,12 @@ Claude can also act on the PCs for you.
 
 Do the phases in order. Each phase works on its own, so you can stop after any of them.
 
+> **Shortcut:** on each PC, copy the `remote-setup` folder, then double-click **`SETUP.bat`**
+> and click **Yes**. It does most of Phases 1, 2, 3 and 5 by itself: it installs Tailscale,
+> RustDesk and Claude, sets the power settings, makes desktop shortcuts and writes a report to
+> `C:\Claude\setup-report.txt`. Afterwards you only do the BIOS step (Phase 4), the phone apps,
+> and the Remote Control setting inside the Claude app.
+
 ---
 
 ## The 5 pieces
