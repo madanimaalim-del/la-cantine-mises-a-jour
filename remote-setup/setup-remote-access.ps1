@@ -14,6 +14,7 @@
 #   8. Writes a report to C:\Claude\setup-report.txt
 
 $ErrorActionPreference = 'Continue'
+$ProgressPreference = 'SilentlyContinue'   # PS 5.1 downloads are 10-50x slower with the progress bar
 
 # ---------- self-elevate ----------
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
@@ -34,6 +35,7 @@ function Ok($t)   { Write-Host "  [OK] $t" -ForegroundColor Green }
 function Warn($t) { Write-Host "  [!!] $t" -ForegroundColor Yellow }
 
 $hasWinget = [bool](Get-Command winget -ErrorAction SilentlyContinue)
+if ($hasWinget) { winget source update 2>&1 | Out-Null }   # refresh package list (old lists miss packages)
 
 function Install-Winget($id) {
     if (-not $hasWinget) { return $false }
@@ -87,6 +89,7 @@ if (-not (Test-Path $rd)) {
             $rel = Invoke-RestMethod 'https://api.github.com/repos/rustdesk/rustdesk/releases/latest' -UseBasicParsing
             $asset = $rel.assets | Where-Object { $_.name -match 'x86_64\.exe$' } | Select-Object -First 1
             $f = Download $asset.browser_download_url 'rustdesk-setup.exe'
+            Write-Host "  Downloading $($asset.name) directly..."
             Start-Process $f -ArgumentList '--silent-install' -Wait
             Start-Sleep 15
         } catch { Warn "RustDesk download failed: $_" }
